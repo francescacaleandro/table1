@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Classifica – Kings League</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --c-bg:#000;--c-surface:#151515;--c-text:#fff;--c-subtext:#b3b3b3;
+    --c-success:#22c55e;--c-warning:#ffe46c;--c-orange:#ff914d;
+    --radius-card:18px;--shadow-card:0 6px 16px rgba(0,0,0,.75);
+    font-family:Inter,system-ui,sans-serif;
+  }
+  html,body{margin:0;padding:0;background:var(--c-bg);color:var(--c-text);overflow-x:hidden;}
+  .table-wrapper{background:#000;
+    background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.03) 0 8px,transparent 8px 16px);
+    border-radius:var(--radius-card);box-shadow:var(--shadow-card);
+    overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;max-width:640px;margin:0 auto 24px;}
+  .table-wrapper::-webkit-scrollbar{display:none;}
+  table{border-collapse:collapse;width:100%;min-width:640px;}
+  thead th{background:var(--c-surface);color:var(--c-subtext);font-weight:600;font-size:.8rem;
+    letter-spacing:.15px;padding:14px 24px;text-transform:uppercase;position:sticky;top:0;z-index:2;}
+  thead th:first-child,tbody td:first-child{position:sticky;left:0;background:var(--c-surface);z-index:3;}
+  thead th:first-child{z-index:4;}
+  tbody td{font-size:.95rem;padding:18px 24px;border-bottom:1px solid #222;}
+  tbody tr:last-child td{border-bottom:none;}
+  .pos-cell{position:relative;font-weight:600;}
+  .pos-cell .pos-bar{position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:3px 0 0 3px;}
+  .playoff-semifinale .pos-bar{background:var(--c-success);}
+  .playoff-quarti .pos-bar{background:var(--c-warning);}
+  .playin .pos-bar{background:var(--c-orange);}
+  .team-cell{display:flex;align-items:center;gap:10px;}
+  .team-cell img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 2px rgba(0,0,0,.6));}
+  @media(max-width:420px){tbody td{font-size:.85rem;padding:14px 16px;}thead th{padding:12px 16px;font-size:.7rem;}}
+</style>
+</head>
+<body>
+
+<div class="table-wrapper">
+  <table id="classifica"><thead></thead><tbody></tbody></table>
+</div>
+
+<script>
+/* ---------- auto-resize iframe ---------- */
+function sendHeight(){parent.postMessage({iframeHeight:document.documentElement.scrollHeight},'*');}
+window.addEventListener('load',sendHeight);window.addEventListener('resize',sendHeight);
+
+/* ---------- Sheet IDs ---------- */
+const sheetA='17j8m3WL0WfBK_L7HjcvJ_9XuqbwbRHuCThxJ6x_be6A';
+const sheetB='1Fgn1DZO1LGYV6060zWq441zEOwrtMJd_HmgdpKA5Mqg';
+const tabA='GironeA', tabB='GironeB';
+const table = document.getElementById('classifica');
+
+/* ---- girone iniziale via query-string ---- */
+const params = new URLSearchParams(location.search);
+let girone = params.get('g')==='B' ? 'B' : 'A';
+load(girone);
+
+/* ---- ascolta cambio girone da parent ---- */
+window.addEventListener('message', e=>{
+  if(e.data && (e.data.girone==='A'||e.data.girone==='B') && e.data.girone!==girone){
+    girone = e.data.girone;
+    load(girone);
+  }
+});
+
+/* ---------- fetch & render ---------- */
+async function load(g){
+  const sheetId = g==='A'?sheetA:sheetB;
+  const tabName = g==='A'?tabA:tabB;
+  try{
+    const res = await fetch(`https://opensheet.elk.sh/${sheetId}/${encodeURIComponent(tabName)}`);
+    let data = await res.json();
+    data = data.filter(r=>r.POS && /^\d+$/.test(r.POS.trim()));
+    if(!data.length){renderEmpty();return;}
+    data.sort((a,b)=>Number(a.POS)-Number(b.POS));
+    buildHead(data[0]);
+    buildBody(data);
+  }catch(err){console.error(err);renderEmpty(true);}
+  sendHeight();
+}
+
+/* ---- HEAD senza la colonna logoURL ---- */
+function buildHead(rowObj){
+  const keys = Object.keys(rowObj).filter(k=>k!=='logoURL');
+  const thead = table.querySelector('thead');
+  thead.innerHTML='';
+  const tr=document.createElement('tr');
+  keys.forEach(k=>{
+    const th=document.createElement('th');
+    th.textContent=k;
+    tr.appendChild(th);
+  });
+  thead.appendChild(tr);
+}
+
+/* ---- BODY: logo dentro la cella SQUADRA ---- */
+function buildBody(rows){
+  const tbody = table.querySelector('tbody');
+  tbody.innerHTML='';
+
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    const p=Number(r.POS);
+    if(p===1) tr.classList.add('playoff-semifinale');
+    else if(p<=6) tr.classList.add('playoff-quarti');
+    else if(p<=10) tr.classList.add('playin');
+
+    Object.keys(r)
+      .filter(k=>k!=='logoURL')          // salta la colonna tecnica
+      .forEach(k=>{
+        const td=document.createElement('td');
+
+        if(k==='POS'){
+          td.classList.add('pos-cell');
+          td.innerHTML=`${r[k]}<span class="pos-bar"></span>`;
+        } else if(k==='SQUADRA'){
+          const wrap=document.createElement('div');
+          wrap.classList.add('team-cell');
+          if(r.logoURL){
+            const img=document.createElement('img');
+            img.src=r.logoURL;
+            img.alt=r[k];
+            img.onerror=()=>img.style.display='none';
+            wrap.appendChild(img);
+          }
+          const span=document.createElement('span');
+          span.textContent=r[k]||'';
+          wrap.appendChild(span);
+          td.appendChild(wrap);
+        } else {
+          td.textContent=r[k]||'';
+        }
+        tr.appendChild(td);
+      });
+
+    tbody.appendChild(tr);
+  });
+}
+
+function renderEmpty(err=false){
+  table.querySelector('thead').innerHTML='';
+  table.querySelector('tbody').innerHTML=
+    `<tr><td colspan="999" style="padding:24px;text-align:center;color:var(--c-subtext)">
+      ${err?'Errore di caricamento':'Nessun dato disponibile'}
+     </td></tr>`;
+}
+</script>
+</body>
+</html>
