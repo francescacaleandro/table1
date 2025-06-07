@@ -29,8 +29,8 @@
   .pos-cell{position:relative;font-weight:600;}
   .pos-cell .pos-bar{position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:3px 0 0 3px;}
   .playoff-semifinale .pos-bar{background:var(--c-success);}
-  .playoff-quarti .pos-bar{background:var(--c-warning);}
-  .playin .pos-bar{background:var(--c-orange);}
+  .playoff-quarti      .pos-bar{background:var(--c-warning);}
+  .playin              .pos-bar{background:var(--c-orange);}
   .team-cell{display:flex;align-items:center;gap:10px;}
   .team-cell img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 2px rgba(0,0,0,.6));}
   @media(max-width:420px){tbody td{font-size:.85rem;padding:14px 16px;}thead th{padding:12px 16px;font-size:.7rem;}}
@@ -48,17 +48,20 @@ function sendHeight(){parent.postMessage({iframeHeight:document.documentElement.
 window.addEventListener('load',sendHeight);window.addEventListener('resize',sendHeight);
 
 /* ---------- Sheet IDs ---------- */
-const sheetA='17j8m3WL0WfBK_L7HjcvJ_9XuqbwbRHuCThxJ6x_be6A';
-const sheetB='1Fgn1DZO1LGYV6060zWq441zEOwrtMJd_HmgdpKA5Mqg';
-const tabA='GironeA', tabB='GironeB';
-const table = document.getElementById('classifica');
+const sheetA = '17j8m3WL0WfBK_L7HjcvJ_9XuqbwbRHuCThxJ6x_be6A';
+const sheetB = '1Fgn1DZO1LGYV6060zWq441zEOwrtMJd_HmgdpKA5Mqg';
+const tabA   = 'GironeA',  tabB = 'GironeB';
+const table  = document.getElementById('classifica');
+
+/* ---------- percorso immagini nel repo ---------- */
+const IMG_BASE = "https://francescacaleandro.github.io/table1/images/";
 
 /* ---- girone iniziale via query-string ---- */
 const params = new URLSearchParams(location.search);
-let girone = params.get('g')==='B' ? 'B' : 'A';
+let girone = params.get('g') === 'B' ? 'B' : 'A';
 load(girone);
 
-/* ---- ascolta cambio girone da parent ---- */
+/* ---- ascolta cambio girone dall'iframe padre ---- */
 window.addEventListener('message', e=>{
   if(e.data && (e.data.girone==='A'||e.data.girone==='B') && e.data.girone!==girone){
     girone = e.data.girone;
@@ -71,9 +74,9 @@ async function load(g){
   const sheetId = g==='A'?sheetA:sheetB;
   const tabName = g==='A'?tabA:tabB;
   try{
-    const res = await fetch(`https://opensheet.elk.sh/${sheetId}/${encodeURIComponent(tabName)}`);
-    let data = await res.json();
-    data = data.filter(r=>r.POS && /^\d+$/.test(r.POS.trim()));
+    const res  = await fetch(`https://opensheet.elk.sh/${sheetId}/${encodeURIComponent(tabName)}`);
+    let data   = await res.json();
+    data       = data.filter(r => r.POS && /^\d+$/.test(r.POS.trim()));
     if(!data.length){renderEmpty();return;}
     data.sort((a,b)=>Number(a.POS)-Number(b.POS));
     buildHead(data[0]);
@@ -82,15 +85,15 @@ async function load(g){
   sendHeight();
 }
 
-/* ---- HEAD senza la colonna logoURL ---- */
+/* ---- HEAD senza la colonna logoFile ---- */
 function buildHead(rowObj){
-  const keys = Object.keys(rowObj).filter(k=>k!=='logoURL');
+  const keys  = Object.keys(rowObj).filter(k => k!=='logoFile');
   const thead = table.querySelector('thead');
-  thead.innerHTML='';
-  const tr=document.createElement('tr');
+  thead.innerHTML = '';
+  const tr = document.createElement('tr');
   keys.forEach(k=>{
-    const th=document.createElement('th');
-    th.textContent=k;
+    const th = document.createElement('th');
+    th.textContent = k;
     tr.appendChild(th);
   });
   thead.appendChild(tr);
@@ -99,39 +102,44 @@ function buildHead(rowObj){
 /* ---- BODY: logo dentro la cella SQUADRA ---- */
 function buildBody(rows){
   const tbody = table.querySelector('tbody');
-  tbody.innerHTML='';
+  tbody.innerHTML = '';
 
   rows.forEach(r=>{
-    const tr=document.createElement('tr');
-    const p=Number(r.POS);
+    const tr = document.createElement('tr');
+    const p  = Number(r.POS);
     if(p===1) tr.classList.add('playoff-semifinale');
     else if(p<=6) tr.classList.add('playoff-quarti');
     else if(p<=10) tr.classList.add('playin');
 
     Object.keys(r)
-      .filter(k=>k!=='logoURL')          // salta la colonna tecnica
+      .filter(k => k!=='logoFile')              // salta la colonna tecnica
       .forEach(k=>{
-        const td=document.createElement('td');
+        const td = document.createElement('td');
 
         if(k==='POS'){
           td.classList.add('pos-cell');
-          td.innerHTML=`${r[k]}<span class="pos-bar"></span>`;
-        } else if(k==='SQUADRA'){
-          const wrap=document.createElement('div');
+          td.innerHTML = `${r[k]}<span class="pos-bar"></span>`;
+        }
+        else if(k==='SQUADRA'){
+          const wrap = document.createElement('div');
           wrap.classList.add('team-cell');
-          if(r.logoURL){
-            const img=document.createElement('img');
-            img.src=r.logoURL;
-            img.alt=r[k];
-            img.onerror=()=>img.style.display='none';
+
+          const file = r.logoFile?.trim();
+          if(file){
+            const img = document.createElement('img');
+            img.src = IMG_BASE + file;
+            img.alt = r[k];
+            img.onerror = () => img.style.display='none';
             wrap.appendChild(img);
           }
-          const span=document.createElement('span');
-          span.textContent=r[k]||'';
+
+          const span = document.createElement('span');
+          span.textContent = r[k] || '';
           wrap.appendChild(span);
           td.appendChild(wrap);
-        } else {
-          td.textContent=r[k]||'';
+        }
+        else{
+          td.textContent = r[k] || '';
         }
         tr.appendChild(td);
       });
@@ -144,7 +152,7 @@ function renderEmpty(err=false){
   table.querySelector('thead').innerHTML='';
   table.querySelector('tbody').innerHTML=
     `<tr><td colspan="999" style="padding:24px;text-align:center;color:var(--c-subtext)">
-      ${err?'Errore di caricamento':'Nessun dato disponibile'}
+       ${err ? 'Errore di caricamento' : 'Nessun dato disponibile'}
      </td></tr>`;
 }
 </script>
