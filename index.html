@@ -107,7 +107,7 @@ function buildBody(rows){
   rows.forEach(r=>{
     const tr = document.createElement('tr');
     const p  = Number(r.POS);
-    if(p===1) tr.classList.add('playoff-semifinale');
+    if(p<=2) tr.classList.add('playoff-semifinale');
     else if(p<=6) tr.classList.add('playoff-quarti');
     else if(p<=10) tr.classList.add('playin');
 
